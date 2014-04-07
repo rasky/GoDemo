@@ -1,82 +1,59 @@
 /*
   GoDemo implements a simple TCP demon that decode
-  an ans.1 DER formt, and output the decoded  data on
+  an ans.1 DER format, and output the decoded  data on
   stdout.
 */
 
 package main
 
-
-import(
-	"fmt"
-	"log"
-	"net"
-	"bytes"
-	"math/big"
+import (
 	"encoding/asn1"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"math/big"
+	"net"
+	"reflect"
 )
 
-
 type Result struct {
-	Modulus *big.Int
-	Exponent int
+	Modulus         *big.Int
+	PrivateExponent *big.Int
+	PublicExponent  int
 }
 
 // connHander it is the called
 // goroutine that serve the user requests.
 func connHandler(cn net.Conn) {
 
-	// alloc buffer for incoming data on socket
-	encodeData := new(bytes.Buffer)
+	// close connection on exit, to notify client
+	defer cn.Close()
 
-	// data is a simple slice to collect partial chunks
-	data := make([]byte, 512)
-
-	for {
-		n, err := cn.Read(data)
-
-		if n > 0 {
-			encodeData.Write(data[:n])
-		}
-
-		if err != nil {
-			break;
-		}
-
+	// read all data
+	data, err := ioutil.ReadAll(cn)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
-	// structred data to store decoded data
+	// structured data to store decoded data
 	var decData Result
 
-	// compute unmarchal function
-	_, err := asn1.Unmarshal(encodeData.Bytes(), &decData)
+	// compute unmarshal function
+	_, err = asn1.Unmarshal(data, &decData)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
 	// render decoded data on stdout
-
-	fmt.Print("Decoded\nINTEGER\t\t:")
-	// print modulus
-	for _, v := range decData.Modulus.Bytes() {
-		fmt.Printf("%X", v)
-	}
-
-	// render exponent
-	fmt.Print("\nINTEGER\t\t")
-	fmt.Printf(":%X\n", decData.Exponent)
-
-	fmt.Println();
-
-	// close connection to notify client
-	cn.Close();
+	fmt.Printf("%X\n", decData)
 }
 
 func main() {
 
-	fmt.Println("Der decoder service");
+	fmt.Println("Der decoder service")
 
 	ln, err := net.Listen("tcp", ":4000")
 
